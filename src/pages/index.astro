@@ -1,0 +1,71 @@
+---
+import { db, Users } from "astro:db";
+import { lucia } from "../../db/lucia";
+import { generateId } from "lucia";
+import { Argon2id } from "oslo/password";
+
+const message = Astro.url.searchParams.get("message")! || null;
+
+if (Astro.request.method === "POST") {
+  const body = await Astro.request.formData();
+  const email = body.get("email");
+  const password = body.get("password");
+
+  if (!email || typeof email !== "string") {
+    return Astro.redirect(
+      "/register?message=There was an issue please try again",
+    );
+  }
+  if (!password || typeof password !== "string" || password.length < 6) {
+    return Astro.redirect(
+      "/register?message=There was an issue please try again",
+    );
+  }
+
+  const user = await db.select().from(Users);
+
+  console.log("fhjridjadklas", user);
+
+  if (!user) {
+    return Astro.redirect("/?message=There was an issue please try again");
+  }
+
+  const validPassword = await new Argon2id().verify(
+    user[0].password_hash,
+    password,
+  );
+
+  if (!validPassword) {
+    return Astro.redirect("/?message=There was an issue please try again");
+  }
+
+  const session = await lucia.createSession(user[0].id, {});
+  const sessionCookie = lucia.createSessionCookie(session.id);
+
+  Astro.cookies.set("session", sessionCookie.value, {
+    ...sessionCookie.attributes,
+  });
+  return Astro.redirect("/protected");
+}
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="generator" content={Astro.generator} />
+    <title>Astro</title>
+  </head>
+  <body>
+    <h1>Astro</h1>
+    <form action="/" method="post">
+      <label for="email">Email</label><br />
+      <input id="email" type="email" name="email" /><br />
+      <label for="password">password</label><br />
+      <input id="password" type="password" name="password" /><br />
+      <button type="submit">Sign In</button><br />
+      {message && <span>{message}</span>}
+    </form>
+  </body>
+</html>

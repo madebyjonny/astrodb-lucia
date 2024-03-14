@@ -1,0 +1,67 @@
+---
+import { db, Users } from "astro:db";
+import { lucia } from "../../db/lucia";
+import { generateId } from "lucia";
+import { Argon2id } from "oslo/password";
+
+const message = Astro.url.searchParams.get("message")! || null;
+
+if (Astro.request.method === "POST") {
+  const body = await Astro.request.formData();
+  const email = body.get("email");
+  const password = body.get("password");
+
+  if (!email || typeof email !== "string") {
+    return new Response("Invalid email", {
+      status: 400,
+    });
+  }
+  if (!password || typeof password !== "string" || password.length < 6) {
+    return new Response("Invalid password", {
+      status: 400,
+    });
+  }
+
+  const hashedPassword = await new Argon2id().hash(password);
+  const userId = generateId(15);
+
+  try {
+    await db.insert(Users).values({
+      id: userId,
+      email,
+      password_hash: hashedPassword,
+    });
+
+    const session = await lucia.createSession(userId, {});
+    const sessionCookie = lucia.createSessionCookie(session.id);
+
+    Astro.cookies.set("session", sessionCookie);
+    return Astro.redirect("/protected");
+  } catch (error) {
+    return Astro.redirect(
+      "/register?message=There was an issue please try again",
+    );
+  }
+}
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="generator" content={Astro.generator} />
+    <title>Astro</title>
+  </head>
+  <body>
+    <h1>Astro</h1>
+    <form action="/register" method="post">
+      <label for="email">Email</label><br />
+      <input id="email" type="email" name="email" /><br />
+      <label for="password">password</label><br />
+      <input id="password" type="password" name="password" /><br />
+      <button type="submit">Register</button><br />
+      {message && <span>{message}</span>}
+    </form>
+  </body>
+</html>
