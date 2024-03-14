@@ -24,8 +24,6 @@ if (Astro.request.method === "POST") {
 
   const user = await db.select().from(Users);
 
-  console.log("fhjridjadklas", user);
-
   if (!user) {
     return Astro.redirect("/?message=There was an issue please try again");
   }
